@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Resume Matcher & JD Extractor</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary': '#4f46e5',
+                        'secondary': '#8b5cf6',
+                    },
+                },
+                fontFamily: {
+                    sans: ['Inter', 'sans-serif'],
+                },
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+
+        /* Custom scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 min-h-screen flex items-center justify-center p-4">
+
+    <div id="app" class="w-full max-w-4xl bg-white rounded-xl shadow-2xl p-6 md:p-10 border border-gray-100">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-extrabold text-gray-900 leading-tight">AI Resume & JD Analyzer</h1>
+            <p class="mt-2 text-lg text-gray-500">Upload your Resume and a Job Description (PDFs only) to get a match
+                score and key requirement extraction.</p>
+        </header>
+
+        <!-- Input Section -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <!-- Resume Upload -->
+            <div class="space-y-2">
+                <label for="resumeFile" class="block text-sm font-medium text-gray-700">Upload Resume (PDF)</label>
+                <input type="file" id="resumeFile" accept="application/pdf"
+                    class="w-full border border-gray-300 rounded-lg p-3 text-sm text-gray-900 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 transition duration-150">
+            </div>
+
+            <!-- JD Upload -->
+            <div class="space-y-2">
+                <label for="jdFile" class="block text-sm font-medium text-gray-700">Upload Job Description (PDF)</label>
+                <input type="file" id="jdFile" accept="application/pdf"
+                    class="w-full border border-gray-300 rounded-lg p-3 text-sm text-gray-900 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-secondary/10 file:text-secondary hover:file:bg-secondary/20 transition duration-150">
+            </div>
+        </div>
+
+        <button id="analyzeBtn"
+            class="w-full py-3 px-6 bg-primary text-white font-semibold rounded-lg shadow-md hover:bg-primary/90 focus:outline-none focus:ring-4 focus:ring-primary/50 transition duration-150 disabled:opacity-50 flex items-center justify-center">
+            <span id="buttonText">Analyze Match</span>
+            <svg id="loadingSpinner" class="animate-spin -ml-1 mr-3 h-5 w-5 text-white hidden"
+                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                </path>
+            </svg>
+        </button>
+
+        <div id="errorMessage"
+            class="mt-4 text-center text-red-600 font-medium hidden p-3 bg-red-50 rounded-lg border border-red-200">
+        </div>
+
+        <!-- Results Section -->
+        <div id="results" class="mt-10 pt-6 border-t border-gray-200 hidden">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">Analysis Results</h2>
+
+            <!-- Score Card -->
+            <div
+                class="bg-primary/5 p-6 rounded-xl border border-primary/10 mb-8 flex flex-col sm:flex-row items-center justify-between shadow-inner">
+                <div class="flex items-center space-x-4">
+                    <svg class="w-10 h-10 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 19V6l12-3v14M9 19c-3.866 0-7-3.134-7-7s3.134-7 7-7m0 14c3.866 0 7-3.134 7-7s-3.134-7-7-7">
+                        </path>
+                    </svg>
+                    <span class="text-lg font-semibold text-gray-700">Match Score (1-10):</span>
+                </div>
+                <div id="matchScoreDisplay" class="text-5xl font-extrabold text-primary mt-4 sm:mt-0">--</div>
+            </div>
+
+            <!-- Extracted Requirements -->
+            <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-lg mb-8">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                    Job Description Requirements
+                </h3>
+                <div class="space-y-4 text-gray-700">
+                    <div>
+                        <p class="font-medium text-sm text-secondary uppercase">Skills:</p>
+                        <p id="jdSkillsList" class="ml-4 list-disc pl-5"></p>
+                    </div>
+                    <div>
+                        <p class="font-medium text-sm text-secondary uppercase">Experience:</p>
+                        <p id="jdExperience" class="pl-0"></p>
+                    </div>
+                    <div>
+                        <p class="font-medium text-sm text-secondary uppercase">Education:</p>
+                        <p id="jdEducation" class="pl-0"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Justification -->
+            <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-lg">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2m-9 0V3h4v2m-4 0h4">
+                        </path>
+                    </svg>
+                    Justification
+                </h3>
+                <p id="justificationText" class="text-gray-700 leading-relaxed"></p>
+            </div>
+        </div>
+
+    </div>
+
+    <script type="module">
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const resumeFile = document.getElementById('resumeFile');
+        const jdFile = document.getElementById('jdFile');
+        const resultsDiv = document.getElementById('results');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const buttonText = document.getElementById('buttonText');
+        const errorMessageDiv = document.getElementById('errorMessage');
+
+        const apiKey = "";
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+        // --- Helper Function to Read File ---
+        const readFileAsBase64 = (file) => {
+            return new Promise((resolve, reject) => {
+                if (!file) return resolve(null);
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.split(',')[1]); // Only need the base64 part
+                reader.onerror = (error) => reject(error);
+                reader.readAsDataURL(file);
+            });
+        };
+
+        // --- Structured JSON Schema ---
+        const responseSchema = {
+            type: "OBJECT",
+            properties: {
+                jdRequirements: {
+                    type: "OBJECT",
+                    description: "Extracted key requirements from the Job Description.",
+                    properties: {
+                        skills: {
+                            type: "ARRAY",
+                            items: { type: "STRING" },
+                            description: "List of key skills required."
+                        },
+                        experience: {
+                            type: "STRING",
+                            description: "Summary of required experience level/years."
+                        },
+                        education: {
+                            type: "STRING",
+                            description: "Summary of required education/degree."
+                        }
+                    }
+                },
+                matchScore: {
+                    type: "INTEGER",
+                    description: "Score from 1 (poor match) to 10 (perfect match)."
+                },
+                justification: {
+                    type: "STRING",
+                    description: "Detailed justification for the match score."
+                }
+            },
+            propertyOrdering: ["jdRequirements", "matchScore", "justification"]
+        };
+
+
+        // --- Main Analysis Function ---
+        const analyzeDocuments = async () => {
+            errorMessageDiv.classList.add('hidden');
+            resultsDiv.classList.add('hidden');
+
+            const resume = resumeFile.files[0];
+            const jd = jdFile.files[0];
+
+            if (!resume || !jd) {
+                errorMessageDiv.textContent = "Please upload both a Resume (PDF) and a Job Description (PDF).";
+                errorMessageDiv.classList.remove('hidden');
+                return;
+            }
+
+            // UI State: Loading
+            analyzeBtn.disabled = true;
+            loadingSpinner.classList.remove('hidden');
+            buttonText.textContent = 'Analyzing...';
+
+            try {
+                const resumeBase64 = await readFileAsBase64(resume);
+                const jdBase64 = await readFileAsBase64(jd);
+
+                const systemPrompt = "You are a world-class HR Analyst. Your task is to analyze a candidate's Resume against a Job Description (JD). First, meticulously extract the key requirements (skills, experience, and education) from the JD. Second, compare the Resume content to these requirements. Finally, generate a comprehensive match score from 1 to 10 and a detailed justification for that score. The output MUST strictly adhere to the provided JSON schema.";
+
+                const userQuery = `Analyze the provided Resume (first PDF) against the Job Description (second PDF).
+                1. Extract the required skills, experience, and education from the JD.
+                2. Score the Resume's match against the JD requirements (1-10).
+                3. Provide a detailed justification for the score.`;
+
+                const payload = {
+                    contents: [
+                        {
+                            role: "user", parts: [
+                                { inlineData: { mimeType: resume.type, data: resumeBase64 } },
+                                { inlineData: { mimeType: jd.type, data: jdBase64 } },
+                                { text: userQuery }
+                            ]
+                        }
+                    ],
+                    systemInstruction: { parts: [{ text: systemPrompt }] },
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        responseSchema: responseSchema,
+                    }
+                };
+
+                let response;
+                let result;
+                let maxRetries = 5;
+                let delay = 1000; // 1 second
+
+                for (let i = 0; i < maxRetries; i++) {
+                    try {
+                        response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (response.ok) {
+                            result = await response.json();
+                            break; // Success
+                        } else if (response.status === 429 && i < maxRetries - 1) {
+                            // Too Many Requests, wait and retry
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            delay *= 2; // Exponential backoff
+                        } else {
+                            // Non-retryable error
+                            const errorData = await response.json();
+                            throw new Error(`API call failed: ${response.status} - ${errorData.error.message}`);
+                        }
+                    } catch (error) {
+                        if (i === maxRetries - 1) throw error;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        delay *= 2; // Exponential backoff
+                    }
+                }
+
+                if (!result) throw new Error("API failed to return a response after retries.");
+
+                const jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (!jsonText) throw new Error("Model response was empty or malformed.");
+
+                const parsedData = JSON.parse(jsonText);
+                console.log("Parsed Data:", parsedData); // Debugging
+
+                // Update Results UI
+                document.getElementById('matchScoreDisplay').textContent = parsedData.matchScore || 'N/A';
+                document.getElementById('justificationText').textContent = parsedData.justification || 'No justification provided by the model.';
+
+                const skillsContainer = document.getElementById('jdSkillsList');
+                skillsContainer.innerHTML = '';
+                if (parsedData.jdRequirements && Array.isArray(parsedData.jdRequirements.skills)) {
+                    parsedData.jdRequirements.skills.forEach(skill => {
+                        const li = document.createElement('li');
+                        li.textContent = skill;
+                        li.classList.add('list-disc', 'ml-5');
+                        skillsContainer.appendChild(li);
+                    });
+                } else {
+                    skillsContainer.textContent = 'Skills not explicitly extracted.';
+                    skillsContainer.classList.remove('list-disc', 'ml-5');
+                }
+
+                document.getElementById('jdExperience').textContent = parsedData.jdRequirements?.experience || 'Experience requirement not extracted.';
+                document.getElementById('jdEducation').textContent = parsedData.jdRequirements?.education || 'Education requirement not extracted.';
+
+                resultsDiv.classList.remove('hidden');
+
+            } catch (error) {
+                console.error("Analysis Error:", error);
+                errorMessageDiv.textContent = `Error during analysis: ${error.message}. Please check your files and try again.`;
+                errorMessageDiv.classList.remove('hidden');
+            } finally {
+                // UI State: Ready
+                analyzeBtn.disabled = false;
+                loadingSpinner.classList.add('hidden');
+                buttonText.textContent = 'Analyze Match';
+            }
+        };
+
+        analyzeBtn.addEventListener('click', analyzeDocuments);
+
+    </script>
+</body>
+
+</html>
